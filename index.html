@@ -234,10 +234,11 @@ var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAft
     <div class="top"><div class="brand"><div class="logo">★</div><div><div class="bt">启点 · 五维四型自评</div><div class="bs">先填基础信息，用于文化、体质维度评分</div></div></div></div>
     <div style="padding:18px 18px 0;">
       <div class="row2">
-        <div class="field"><label>称呼 <span class="hint">（可不填）</span></label><input type="text" id="f-name" placeholder="如：小李"></div>
+        <div class="field"><label>姓名 <span class="req">*</span></label><input type="text" id="f-name" placeholder="请输入姓名"></div>
         <div class="field"><label>性别 <span class="req">*</span></label>
           <div class="seg" id="f-sex"><div class="s on" data-v="male">男</div><div class="s" data-v="female">女</div></div></div>
       </div>
+      <div class="field"><label>联系电话 <span class="req">*</span></label><input type="tel" id="f-tel" placeholder="请输入手机号"></div>
       <div class="field"><label>年龄 <span class="req">*</span></label>
         <div class="opts" id="f-age"></div></div>
       <div class="row2">
@@ -331,12 +332,16 @@ function startQuiz(){go('info');}
 function picked(id){var el=$(id).querySelector('.opt.on');return el?el.dataset.v:null;}
 function pickedMulti(id){return Array.prototype.slice.call($(id).querySelectorAll('.opt.mini-on')).map(function(x){return x.dataset.v;});}
 function goQuiz(){
+  var name=$('f-name').value.trim(),tel=$('f-tel').value.trim();
   var age=picked('f-age'),edu=picked('f-edu'),h=$('f-h').value,w=$('f-w').value;
+  if(!name){$('info-warn').textContent='请填写姓名';return;}
+  if(!tel){$('info-warn').textContent='请填写联系电话';return;}
+  if(!/^1[3-9]\d{9}$/.test(tel)){$('info-warn').textContent='请填写正确的11位手机号';return;}
   if(!age){$('info-warn').textContent='请选择年龄';return;}
   if(!edu){$('info-warn').textContent='请选择最高学历';return;}
   if(!h||!w||h<140||h>210||w<35||w>150){$('info-warn').textContent='请填写正确的身高(cm)和体重(kg)';return;}
   $('info-warn').textContent='';
-  STATE.base={name:$('f-name').value.trim()||'同学',sex:STATE.sex,age:+age,h:+h,w:+w,edu:edu};
+  STATE.base={name:name,tel:tel,sex:STATE.sex,age:+age,h:+h,w:+w,edu:edu};
   buildQuiz();go('quiz');
 }
 
