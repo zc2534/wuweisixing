@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>启点 · 测评数据后台</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#d9e0cb;color:#22331c;min-height:100vh;}
+  .wrap{max-width:480px;margin:0 auto;padding:16px;}
+  .login-box{background:linear-gradient(135deg,#4a6b33,#33501e);color:#fff;border-radius:16px;padding:28px 22px;margin-top:40px;box-shadow:0 6px 20px rgba(0,0,0,.15);}
+  .login-box h1{font-size:20px;letter-spacing:1px;}
+  .login-box p{font-size:12px;color:#d6e2c4;margin-top:6px;}
+  .login-box input{width:100%;margin-top:14px;border:none;border-radius:10px;padding:13px 14px;font-size:16px;outline:none;}
+  .login-box button{width:100%;margin-top:14px;border:none;border-radius:10px;padding:14px;font-size:17px;font-weight:900;background:linear-gradient(90deg,#e3c168,#d8b45a);color:#4a3408;cursor:pointer;}
+  #err{color:#ffd8a8;font-size:13px;margin-top:10px;min-height:18px;}
+  .bar{position:sticky;top:0;background:#d9e0cb;padding:12px 0;display:flex;align-items:center;gap:8px;z-index:5;}
+  .bar .ttl{font-weight:900;flex:1;font-size:16px;}
+  .bar button{border:1.5px solid #3f6024;background:#fff;color:#3f6024;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700;cursor:pointer;}
+  .card{background:#fff;border-radius:14px;padding:15px 16px;margin-bottom:12px;box-shadow:0 3px 10px rgba(60,90,30,.07);}
+  .card .top{display:flex;align-items:center;gap:8px;}
+  .card .name{font-size:18px;font-weight:900;color:#2c4a18;flex:1;}
+  .card .type{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;background:#eef4e4;color:#3f6024;border:1px solid #cdd9bb;}
+  .card .meta{font-size:13px;color:#5c6b50;margin-top:6px;line-height:1.6;}
+  .card .phone{margin-top:8px;}
+  .card .phone a{display:inline-block;font-size:17px;font-weight:900;color:#b22a1e;text-decoration:none;background:#fbf6e7;border:1px solid #ecdcab;border-radius:10px;padding:8px 14px;}
+  .card .score{margin-top:8px;font-size:13px;color:#5c6b50;}
+  .card .score b{color:#3f6024;font-size:15px;}
+  .detail{margin-top:8px;display:none;background:#f4f6ea;border-radius:8px;padding:10px 12px;font-size:12.5px;color:#5c6b50;line-height:1.8;}
+  .detail.on{display:block;}
+  .toggle{font-size:12px;color:#3f6024;font-weight:700;cursor:pointer;margin-top:8px;display:inline-block;}
+  .empty{text-align:center;color:#94a088;padding:40px 0;font-size:14px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="login" class="login-box">
+    <h1>启点 · 测评数据后台</h1>
+    <p>家长提交的测评数据（仅你自己能看）</p>
+    <input id="email" type="email" placeholder="登录邮箱">
+    <input id="password" type="password" placeholder="登录密码">
+    <button onclick="login()">登录</button>
+    <p id="err"></p>
+  </div>
+
+  <div id="data" style="display:none;">
+    <div class="bar">
+      <span class="ttl">提交记录</span>
+      <span id="count" style="font-size:13px;color:#5c6b50;"></span>
+      <button onclick="refresh()">刷新</button>
+      <button onclick="logout()">退出</button>
+    </div>
+    <div id="list"></div>
+  </div>
+
+</div>
+<script>
+var SUPABASE_URL='https://egdruqzivmgfipenuneb.supabase.co';
+var SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZHJ1cXppdm1nZmlwZW51bmViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4OTM1NDEsImV4cCI6MjEwNTQ2OTU0MX0.zMwW7VGJ18NS3kQeJ6BPOpaVJC02NlQRSgDb_z_MO9I';
+var TOKEN=localStorage.getItem('qp_token')||'';
+
+function $(id){return document.getElementById(id);}
+
+function login(){
+  var em=$('email').value.trim(), pw=$('password').value;
+  if(!em||!pw){$('err').textContent='请填写邮箱和密码';return;}
+  fetch(SUPABASE_URL+'/auth/v1/token?grant_type=password',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON},
+    body:JSON.stringify({email:em,password:pw})
+  }).then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+  .then(function(x){
+    if(!x.ok||!x.d.access_token){$('err').textContent='登录失败：邮箱或密码错误';return;}
+    TOKEN=x.d.access_token;localStorage.setItem('qp_token',TOKEN);
+    showData();
+  }).catch(function(){$('err').textContent='网络错误，请重试';});
+}
+
+function showData(){
+  $('login').style.display='none';
+  $('data').style.display='block';
+  refresh();
+}
+
+function refresh(){
+  if(!TOKEN){logout();return;}
+  fetch(SUPABASE_URL+'/rest/v1/submissions?select=*&order=created_at.desc&limit=300',{
+    headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+TOKEN}
+  }).then(function(r){
+    if(r.status===401){logout();return null;}
+    return r.json();
+  }).then(function(rows){
+    if(!rows)return;
+    render(rows);
+  }).catch(function(){});
+}
+
+function fmt(iso){
+  if(!iso)return '';
+  var d=new Date(iso);
+  var p=function(n){return (n<10?'0':'')+n;};
+  return (d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+function render(rows){
+  $('count').textContent='共 '+rows.length+' 条';
+  if(!rows.length){$('list').innerHTML='<div class="empty">还没有提交记录</div>';return;}
+  var html='';
+  rows.forEach(function(r,i){
+    html+='<div class="card">'
+      +'<div class="top"><span class="name">'+esc(r.name||'未填')+'</span><span class="type">'+esc(r.type||'')+'</span></div>'
+      +'<div class="meta">'+esc(r.sex||'')+(r.age?' · '+r.age+'岁':'')+(r.edu?' · '+esc(r.edu):'')+'</div>'
+      +'<div class="meta">提交于 '+fmt(r.created_at)+'</div>'
+      +'<div class="phone"><a href="tel:'+esc(r.tel||'')+'">📞 '+esc(r.tel||'无')+'</a></div>'
+      +'<div class="score">总分 <b>'+r.total+'</b> / 500 · '+esc(r.grade||'')+'</div>'
+      +'<span class="toggle" onclick="tgl('+i+')">查看五维详情 ▾</span>'
+      +'<div class="detail" id="d'+i+'">'
+        +'文化 '+r.edu_score+' · 体质 '+r.phys_score+' · 体能 '+r.fit_score+' · 心理 '+r.psy_score+' · 军职 '+r.mil_score+'<br>'
+        +'BMI '+r.bmi+' · 身高 '+r.height+'cm · 体重 '+r.weight+'kg'
+      +'</div>'
+      +'</div>';
+  });
+  $('list').innerHTML=html;
+}
+
+function tgl(i){var d=$('d'+i);if(d)d.classList.toggle('on');}
+
+function logout(){TOKEN='';localStorage.removeItem('qp_token');$('data').style.display='none';$('login').style.display='block';}
+
+if(TOKEN){showData();}
+</script>
+</body>
+</html>
