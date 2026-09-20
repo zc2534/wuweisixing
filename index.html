@@ -561,6 +561,34 @@ function submit(){
   $('r-disc').innerHTML='本结果依据公开征兵政策与《国家学生体质健康标准》制作，为<b>民间适应性自评参考</b>，非兵役机关官方评分，不构成定兵依据或入伍承诺。各维度细则、权重与分数线以当年长沙市/各区征兵办公布为准，官方役前教育全程免费。报名请认准“中国征兵网 / 全国征兵网（gfbzb.gov.cn）”。';
   go('result');window.scrollTo(0,0);
   setTimeout(drawRadar,120);
+  saveSubmission(R);
+}
+
+/* ================= 提交到后端 ================= */
+var SUPABASE_URL='https://egdruqzivmgfipenuneb.supabase.co';
+var SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZHJ1cXppdm1nZmlwZW51bmViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4OTM1NDEsImV4cCI6MjEwNTQ2OTU0MX0.zMwW7VGJ18NS3kQeJ6BPOpaVJC02NlQRSgDb_z_MO9I';
+function eduLabel(code){for(var i=0;i<EDUS.length;i++){if(EDUS[i][0]===code)return EDUS[i][1];}return code;}
+function saveSubmission(R){
+  try{
+    var b=STATE.base,g=gradeOf(R.total),c=classify(R);
+    var payload={
+      name:b.name,tel:b.tel,sex:(b.sex==='male'?'男':'女'),age:b.age,
+      height:b.h,weight:b.w,edu:eduLabel(b.edu),
+      total:R.total,grade:g[0],type:c.type,
+      edu_score:R.edu,phys_score:R.phys,fit_score:R.fit,psy_score:R.psy,mil_score:R.mil,
+      bmi:Math.round(R.bmi*10)/10,answers:STATE.answers
+    };
+    fetch(SUPABASE_URL+'/rest/v1/submissions',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':SUPABASE_ANON,
+        'Authorization':'Bearer '+SUPABASE_ANON,
+        'Prefer':'return=minimal'
+      },
+      body:JSON.stringify(payload)
+    }).catch(function(){});
+  }catch(e){}
 }
 function drawRadar(){
   var R=STATE.result;
