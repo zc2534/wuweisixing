@@ -29,6 +29,8 @@
   .detail{margin-top:8px;display:none;background:#f4f6ea;border-radius:8px;padding:10px 12px;font-size:12.5px;color:#5c6b50;line-height:1.8;}
   .detail.on{display:block;}
   .toggle{font-size:12px;color:#3f6024;font-weight:700;cursor:pointer;margin-top:8px;display:inline-block;}
+  .acts{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+  .del{font-size:12px;color:#b22a1e;font-weight:700;cursor:pointer;}
   .empty{text-align:center;color:#94a088;padding:40px 0;font-size:14px;}
 </style>
 </head>
@@ -48,6 +50,7 @@
     <div class="bar">
       <span class="ttl">提交记录</span>
       <span id="count" style="font-size:13px;color:#5c6b50;"></span>
+      <button onclick="exportCSV()">导出</button>
       <button onclick="refresh()">刷新</button>
       <button onclick="logout()">退出</button>
     </div>
@@ -59,6 +62,7 @@
 var SUPABASE_URL='https://egdruqzivmgfipenuneb.supabase.co';
 var SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZHJ1cXppdm1nZmlwZW51bmViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4OTM1NDEsImV4cCI6MjEwNTQ2OTU0MX0.zMwW7VGJ18NS3kQeJ6BPOpaVJC02NlQRSgDb_z_MO9I';
 var TOKEN=localStorage.getItem('qp_token')||'';
+var ROWS=[];
 
 function $(id){return document.getElementById(id);}
 
@@ -106,6 +110,7 @@ function fmt(iso){
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 
 function render(rows){
+  ROWS=rows;
   $('count').textContent='共 '+rows.length+' 条';
   if(!rows.length){$('list').innerHTML='<div class="empty">还没有提交记录</div>';return;}
   var html='';
@@ -116,7 +121,7 @@ function render(rows){
       +'<div class="meta">提交于 '+fmt(r.created_at)+'</div>'
       +'<div class="phone"><a href="tel:'+esc(r.tel||'')+'">📞 '+esc(r.tel||'无')+'</a></div>'
       +'<div class="score">总分 <b>'+r.total+'</b> / 500 · '+esc(r.grade||'')+'</div>'
-      +'<span class="toggle" onclick="tgl('+i+')">查看五维详情 ▾</span>'
+      +'<div class="acts"><span class="toggle" onclick="tgl('+i+')">查看详情 ▾</span><span class="del" onclick="del('+i+')">🗑 删除</span></div>'
       +'<div class="detail" id="d'+i+'">'
         +'文化 '+r.edu_score+' · 体质 '+r.phys_score+' · 体能 '+r.fit_score+' · 心理 '+r.psy_score+' · 军职 '+r.mil_score+'<br>'
         +'BMI '+r.bmi+' · 身高 '+r.height+'cm · 体重 '+r.weight+'kg'
@@ -127,6 +132,36 @@ function render(rows){
 }
 
 function tgl(i){var d=$('d'+i);if(d)d.classList.toggle('on');}
+
+function del(i){
+  var r=ROWS[i];
+  if(!r)return;
+  if(!confirm('确定删除「'+(r.name||'未填')+'」的这条记录吗？删除后无法恢复。'))return;
+  fetch(SUPABASE_URL+'/rest/v1/submissions?id=eq.'+encodeURIComponent(r.id),{
+    method:'DELETE',
+    headers:{'apikey':SUPABASE_ANON,'Authorization':'Bearer '+TOKEN}
+  }).then(function(resp){
+    if(resp.ok){refresh();}
+    else if(resp.status===401){logout();}
+    else{alert('删除失败，请重试');}
+  }).catch(function(){alert('网络错误，请重试');});
+}
+
+function dateStr(){var d=new Date();return d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2);}
+
+function exportCSV(){
+  if(!ROWS.length){alert('还没有数据可导出');return;}
+  var cols=[['name','姓名'],['tel','电话'],['sex','性别'],['age','年龄'],['height','身高(cm)'],['weight','体重(kg)'],['edu','学历'],['total','总分'],['grade','档位'],['type','类型'],['edu_score','文化'],['phys_score','体质'],['fit_score','体能'],['psy_score','心理'],['mil_score','军职'],['bmi','BMI'],['created_at','提交时间']];
+  function cell(v){if(v==null)v='';v=String(v);if(v.indexOf(',')>=0||v.indexOf('"')>=0||v.indexOf('\n')>=0){v='"'+v.replace(/"/g,'""')+'"';}return v;}
+  var lines=[cols.map(function(c){return c[1];}).join(',')];
+  ROWS.forEach(function(r){lines.push(cols.map(function(c){return cell(r[c[0]]);}).join(','));});
+  var csv='﻿'+lines.join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='测评数据_'+dateStr()+'.csv';
+  document.body.appendChild(a);a.click();a.remove();
+}
 
 function logout(){TOKEN='';localStorage.removeItem('qp_token');$('data').style.display='none';$('login').style.display='block';}
 
